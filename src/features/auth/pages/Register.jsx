@@ -1,0 +1,220 @@
+import { useState } from "react";
+import { Link } from "react-router";
+
+const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5000/api/auth";
+
+const Register = () => {
+  const [formData, setFormData] = useState({ username: "", email: "", password: "" });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [submittedEmail, setSubmittedEmail] = useState("");
+
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    setError("");
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (loading) return;
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch(`${API_URL}/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        const fields = Array.isArray(data.errors)
+          ? data.errors.map((item) => item.message).join(" ")
+          : "";
+        setError(data.message || data.error || fields || "Couldn't create your account");
+        return;
+      }
+
+      setSubmittedEmail(data.user?.email || formData.email);
+      setFormData({ username: "", email: "", password: "" });
+    } catch {
+      setError("Couldn't reach Lumina. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="relative min-h-screen overflow-hidden bg-ink font-sans text-frost">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -left-40 -top-40 h-[36rem] w-[36rem] rounded-full bg-lumen/15 blur-[140px]"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -bottom-40 -right-24 h-[30rem] w-[30rem] rounded-full bg-lumen/10 blur-[130px]"
+      />
+
+      <div className="relative mx-auto grid min-h-screen w-full max-w-6xl lg:grid-cols-[1.05fr_1fr]">
+        <section className="hidden flex-col justify-between px-6 py-16 lg:flex lg:pr-16">
+          <Link to="/login" className="flex items-center gap-3">
+            <span className="h-2.5 w-2.5 rounded-full bg-lumen shadow-[0_0_18px_5px_rgba(242,178,76,0.5)]" />
+            <span className="font-display text-2xl tracking-tight">Lumina</span>
+          </Link>
+
+          <div className="max-w-md">
+            <h1 className="font-display text-5xl leading-[1.06] tracking-tight">
+              Conversation, grounded in the live web.
+            </h1>
+            <p className="mt-6 leading-relaxed text-mist">
+              Lumina searches as it answers and streams the reply back the moment it's ready — no
+              stale, out-of-date guesses.
+            </p>
+          </div>
+
+          <p className="text-sm text-mist/60">Project Lumina</p>
+        </section>
+
+        <section className="flex flex-col justify-center px-6 py-14 sm:px-10 lg:py-16 lg:pl-16">
+          <Link to="/login" className="mb-10 flex items-center gap-3 lg:hidden">
+            <span className="h-2.5 w-2.5 rounded-full bg-lumen shadow-[0_0_18px_5px_rgba(242,178,76,0.5)]" />
+            <span className="font-display text-2xl tracking-tight">Lumina</span>
+          </Link>
+
+          {submittedEmail ? (
+            <div className="w-full max-w-sm">
+              <span className="mb-6 inline-flex h-11 w-11 items-center justify-center rounded-full bg-lumen/15 text-lumen">
+                <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
+                  <path
+                    d="M3 7l9 6 9-6M4 5h16a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1z"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </span>
+              <h2 className="font-display text-4xl tracking-tight">Check your inbox</h2>
+              <p className="mt-4 leading-relaxed text-mist">
+                We sent a verification link to{" "}
+                <span className="text-frost">{submittedEmail}</span>. Open it to activate your
+                account, then log in.
+              </p>
+              <Link
+                to="/login"
+                className="mt-8 flex w-full items-center justify-center rounded-xl bg-lumen py-3.5 font-medium text-ink transition hover:brightness-105 hover:shadow-[0_0_28px_rgba(242,178,76,0.35)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lumen"
+              >
+                Go to log in
+              </Link>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="w-full max-w-sm">
+              <h2 className="font-display text-4xl tracking-tight">Create your account</h2>
+              <p className="mt-3 text-sm text-mist">Your first answer is a few fields away.</p>
+
+              <div className="mt-10 space-y-7">
+                <div>
+                  <label htmlFor="username" className="text-sm text-mist">
+                    Username
+                  </label>
+                  <input
+                    id="username"
+                    name="username"
+                    type="text"
+                    autoComplete="username"
+                    required
+                    minLength={3}
+                    maxLength={30}
+                    value={formData.username}
+                    onChange={handleChange}
+                    placeholder="How should Lumina greet you?"
+                    className="mt-2 w-full border-b border-line bg-transparent py-2.5 text-frost outline-none transition-colors placeholder:text-mist/50 focus:border-lumen"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="email" className="text-sm text-mist">
+                    Email
+                  </label>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="you@example.com"
+                    className="mt-2 w-full border-b border-line bg-transparent py-2.5 text-frost outline-none transition-colors placeholder:text-mist/50 focus:border-lumen"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="password" className="text-sm text-mist">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      required
+                      minLength={6}
+                      value={formData.password}
+                      onChange={handleChange}
+                      placeholder="At least 6 characters"
+                      className="mt-2 w-full border-b border-line bg-transparent py-2.5 pr-14 text-frost outline-none transition-colors placeholder:text-mist/50 focus:border-lumen"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((value) => !value)}
+                      className="absolute bottom-2.5 right-0 text-xs text-mist transition-colors hover:text-frost focus-visible:text-frost focus-visible:outline-none"
+                    >
+                      {showPassword ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {error && (
+                <p
+                  role="alert"
+                  className="mt-6 rounded-lg border border-rose/40 bg-rose/10 px-4 py-3 text-sm text-rose"
+                >
+                  {error}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="mt-8 flex w-full items-center justify-center gap-2 rounded-xl bg-lumen py-3.5 font-medium text-ink transition hover:brightness-105 hover:shadow-[0_0_28px_rgba(242,178,76,0.35)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lumen active:translate-y-px disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {loading && (
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-ink/30 border-t-ink" />
+                )}
+                {loading ? "Creating account…" : "Create account"}
+              </button>
+
+              <p className="mt-8 text-sm text-mist">
+                Already have an account?{" "}
+                <Link to="/login" className="text-frost underline-offset-4 hover:underline">
+                  Log in
+                </Link>
+              </p>
+            </form>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+};
+
+export default Register;

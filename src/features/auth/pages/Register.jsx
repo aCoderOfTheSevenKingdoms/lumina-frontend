@@ -1,52 +1,27 @@
 import { useState } from "react";
 import { Link } from "react-router";
-
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5000/api/auth";
+import { useAuth } from "../hook/useAuth";
 
 const Register = () => {
+  const { loading, error, handleRegister, clearError } = useAuth();
   const [formData, setFormData] = useState({ username: "", email: "", password: "" });
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [submittedEmail, setSubmittedEmail] = useState("");
 
   const handleChange = (event) => {
     const { name, value } = event.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    setError("");
+    clearError();
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (loading) return;
 
-    setLoading(true);
-    setError("");
-
-    try {
-      const response = await fetch(`${API_URL}/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        const fields = Array.isArray(data.errors)
-          ? data.errors.map((item) => item.message).join(" ")
-          : "";
-        setError(data.message || data.error || fields || "Couldn't create your account");
-        return;
-      }
-
+    const data = await handleRegister(formData);
+    if (data) {
       setSubmittedEmail(data.user?.email || formData.email);
       setFormData({ username: "", email: "", password: "" });
-    } catch {
-      setError("Couldn't reach Lumina. Check your connection and try again.");
-    } finally {
-      setLoading(false);
     }
   };
 

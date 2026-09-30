@@ -1,62 +1,26 @@
 import { useState } from "react";
 import { Link } from "react-router";
-
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5000/api/auth";
+import { useAuth } from "../hook/useAuth";
 
 const Login = () => {
+  const { user, loading, error, handleLogin, clearError } = useAuth();
   const [formData, setFormData] = useState({ email: "", password: "" });
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [user, setUser] = useState(null);
+
+  const isVerificationError = Boolean(error) && /verif/i.test(error);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    setError("");
-    setNotice("");
+    clearError();
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (loading) return;
 
-    setLoading(true);
-    setError("");
-    setNotice("");
-
-    try {
-      const response = await fetch(`${API_URL}/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        const fields = Array.isArray(data.errors)
-          ? data.errors.map((item) => item.message).join(" ")
-          : "";
-        const message = data.message || data.error || fields || "Invalid email or password";
-
-        if (response.status === 403 || /verif/i.test(message)) {
-          setNotice(message);
-        } else {
-          setError(message);
-        }
-        return;
-      }
-
-      setUser(data.user);
-      setFormData({ email: "", password: "" });
-    } catch {
-      setError("Couldn't reach Lumina. Check your connection and try again.");
-    } finally {
-      setLoading(false);
-    }
+    const data = await handleLogin(formData);
+    if (data) setFormData({ email: "", password: "" });
   };
 
   return (
@@ -166,7 +130,7 @@ const Login = () => {
                 </div>
               </div>
 
-              {error && (
+              {error && !isVerificationError && (
                 <p
                   role="alert"
                   className="mt-6 rounded-lg border border-rose/40 bg-rose/10 px-4 py-3 text-sm text-rose"
@@ -175,12 +139,12 @@ const Login = () => {
                 </p>
               )}
 
-              {notice && (
+              {isVerificationError && (
                 <p
                   role="status"
                   className="mt-6 rounded-lg border border-lumen/40 bg-lumen/10 px-4 py-3 text-sm text-lumen"
                 >
-                  {notice}
+                  {error}
                 </p>
               )}
 

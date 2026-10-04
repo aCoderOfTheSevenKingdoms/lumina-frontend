@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { useAuth } from "../hook/useAuth";
-import { useSelector } from "react-redux";
 
 const Login = () => {
   const { user, loading, error, handleLogin, clearError } = useAuth();

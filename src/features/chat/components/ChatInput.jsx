@@ -41,8 +41,8 @@ const ChatInput = ({ onSend, disabled = false }) => {
   };
 
   return (
-    <div className="border-t border-line bg-ink-2 px-4 py-4 sm:px-6">
-      <div className="mx-auto flex w-full max-w-3xl items-end gap-3 rounded-2xl border border-line bg-panel px-3 py-2 transition-colors focus-within:border-lumen/60">
+    <div className="sticky bottom-0 z-10 px-4 pb-4 pt-3 sm:px-6">
+      <div className="mx-auto flex w-full max-w-3xl items-end gap-3 rounded-2xl border border-line bg-panel/95 px-3 py-2 shadow-xl shadow-ink/50 backdrop-blur transition-colors focus-within:border-lumen/60">
         <textarea
           ref={textareaRef}
           rows={1}

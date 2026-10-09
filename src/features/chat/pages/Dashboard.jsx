@@ -23,6 +23,7 @@ const Dashboard = () => {
     handleSelectChat,
     handleNewChat,
     handleSendMessage,
+    handleDeleteChat,
   } = useChat();
 
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -51,6 +52,11 @@ const Dashboard = () => {
     setDrawerOpen(false);
   };
 
+  const onDeleteChat = (chat) => {
+    if (!window.confirm(`Delete "${chat.title || "this chat"}"?`)) return;
+    handleDeleteChat(chat._id);
+  };
+
   const onSend = (content) => {
     handleSendMessage({ message: content, chatId: currentChatId });
   };
@@ -63,6 +69,7 @@ const Dashboard = () => {
         activeChatId={currentChatId}
         onSelectChat={onSelectChat}
         onNewChat={onNewChat}
+        onDeleteChat={onDeleteChat}
         onLogout={() => {}}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}

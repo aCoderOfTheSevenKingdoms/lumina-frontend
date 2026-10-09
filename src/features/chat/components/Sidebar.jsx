@@ -38,6 +38,18 @@ const ChatIcon = () => (
   </svg>
 );
 
+const TrashIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
+    <path
+      d="M4 7h16M9 7V5.5A1.5 1.5 0 0110.5 4h3A1.5 1.5 0 0115 5.5V7m2 0v11a2 2 0 01-2 2H9a2 2 0 01-2-2V7m3 4v5m4-5v5"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
 const PlusIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
     <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
@@ -62,6 +74,7 @@ const Sidebar = ({
   activeChatId,
   onSelectChat,
   onNewChat,
+  onDeleteChat,
   onLogout,
   open = false,
   onClose,
@@ -122,23 +135,35 @@ const Sidebar = ({
                 const active = chat._id === activeChatId;
                 return (
                   <li key={chat._id}>
-                    <button
-                      type="button"
-                      onClick={() => onSelectChat?.(chat)}
-                      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lumen ${
+                    <div
+                      className={`group flex w-full items-center gap-1 rounded-lg pr-1.5 transition ${
                         active
                           ? "bg-lumen/10 text-lumen"
                           : "text-mist hover:bg-panel hover:text-frost"
                       }`}
                     >
-                      <ChatIcon />
-                      <span className="flex-1 truncate text-left">{chat.title}</span>
-                      <span
-                        className={`shrink-0 text-[11px] ${active ? "text-lumen/80" : "text-mist/50"}`}
+                      <button
+                        type="button"
+                        onClick={() => onSelectChat?.(chat)}
+                        className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-3 py-2.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lumen"
                       >
-                        {formatTimestamp(chat.updatedAt)}
-                      </span>
-                    </button>
+                        <ChatIcon />
+                        <span className="flex-1 truncate text-left">{chat.title}</span>
+                        <span
+                          className={`shrink-0 text-[11px] ${active ? "text-lumen/80" : "text-mist/50"}`}
+                        >
+                          {formatTimestamp(chat.updatedAt)}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDeleteChat?.(chat)}
+                        aria-label={`Delete ${chat.title || "chat"}`}
+                        className="shrink-0 rounded-md p-1.5 text-mist/50 transition hover:bg-rose/10 hover:text-rose focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose"
+                      >
+                        <TrashIcon />
+                      </button>
+                    </div>
                   </li>
                 );
               })}

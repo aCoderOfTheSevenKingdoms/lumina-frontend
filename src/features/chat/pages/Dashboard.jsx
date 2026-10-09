@@ -18,7 +18,7 @@ const Dashboard = () => {
   const { chats, currentChatId, isLoading, error } = useSelector((state) => state.chat);
 
   const {
-    initializeSocketConnection,
+    getSocket,
     handleGetChats,
     handleSelectChat,
     handleNewChat,
@@ -28,7 +28,7 @@ const Dashboard = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
-    initializeSocketConnection();
+    getSocket();
     handleGetChats();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -38,6 +38,8 @@ const Dashboard = () => {
   );
   const activeChat = currentChatId ? chats[currentChatId] : null;
   const messages = activeChat?.messages ?? [];
+  // While a response is streaming, the loader lives inside the AI bubble.
+  const isStreaming = messages.some((message) => message.streaming);
 
   const onSelectChat = (chat) => {
     handleSelectChat(chat);
@@ -101,7 +103,7 @@ const Dashboard = () => {
               {messages.map((message) => (
                 <MessageBubble key={message._id} message={message} />
               ))}
-              {isLoading && <ChatLoader />}
+              {isLoading && !isStreaming && <ChatLoader />}
             </div>
           )}
         </section>

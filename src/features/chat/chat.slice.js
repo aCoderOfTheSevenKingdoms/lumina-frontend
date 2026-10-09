@@ -54,6 +54,69 @@ const chatSlice = createSlice({
             state.chats[chatId].messages = [...(state.chats[chatId].messages ?? []), message];
             state.chats[chatId].updatedAt = new Date().toISOString();
         },
+
+        // streaming-aware actions
+        appendAIMessage: (state, action) => {
+            const { chatId, previousId, title, message } = action.payload;
+
+            // Reconcile a brand-new optimistic chat (temp-chat-*) with the real
+            // Mongo id the server assigned, preserving its messages.
+            if (previousId && previousId !== chatId && state.chats[previousId]) {
+                state.chats[chatId] = state.chats[previousId];
+                delete state.chats[previousId];
+            }
+
+            if (!state.chats[chatId]) {
+                state.chats[chatId] = {
+                    _id: chatId,
+                    title: title || "New conversation",
+                    messages: []
+                };
+            }
+
+            const chat = state.chats[chatId];
+            if (title) chat.title = title;
+            chat.messages = [...(chat.messages ?? []), message];
+            chat.updatedAt = new Date().toISOString();
+        },
+        appendChunk: (state, action) => {
+            const { chatId, chunk } = action.payload;
+            const chat = state.chats[chatId];
+
+            if (!chat) return;
+
+            const messages = chat.messages ?? [];
+
+            // The in-flight AI message is the last message flagged as streaming.
+            for (let i = messages.length - 1; i >= 0; i -= 1) {
+                if (messages[i].streaming) {
+                    messages[i].content = `${messages[i].content ?? ""}${chunk}`;
+                    break;
+                }
+            }
+
+            chat.updatedAt = new Date().toISOString();
+        },
+        finalizeMessage: (state, action) => {
+            const { chatId, messageId, content } = action.payload;
+            const chat = state.chats[chatId];
+
+            if (!chat) return;
+
+            const messages = chat.messages ?? [];
+
+            for (let i = messages.length - 1; i >= 0; i -= 1) {
+                if (messages[i].streaming) {
+                    if (messageId) messages[i]._id = messageId;
+                    if (content != null) messages[i].content = content;
+                    messages[i].streaming = false;
+                    break;
+                }
+            }
+
+            chat.updatedAt = new Date().toISOString();
+        },
+
         removeMessage: (state, action) => {
             const { chatId, messageId } = action.payload;
             const chat = state.chats[chatId];
@@ -88,6 +151,9 @@ export const {
     upsertChat,
     setChatMessages,
     appendMessage,
+    appendAIMessage,
+    appendChunk,
+    finalizeMessage,
     removeMessage,
     removeChat,
     setCurrentChatId,

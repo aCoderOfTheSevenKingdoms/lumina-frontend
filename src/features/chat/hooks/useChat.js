@@ -1,11 +1,14 @@
+import { useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { initializeSocketConnection } from "../service/chat.socket";
-import { sendMessage, getChats, getMessages, deleteChat } from "../service/chat.api";
+import { getSocket } from "../service/chat.socket";
+import { getChats, getMessages, deleteChat } from "../service/chat.api";
 import {
     setChats,
-    upsertChat,
     setChatMessages,
     appendMessage,
+    appendAIMessage,
+    appendChunk,
+    finalizeMessage,
     removeMessage,
     removeChat,
     setCurrentChatId,
@@ -30,6 +33,111 @@ const buildTitle = (message) =>
 export const useChat = () => {
     const dispatch = useDispatch();
     const { chats, currentChatId, isLoading } = useSelector((state) => state.chat);
+
+    /**
+     * Correlates the outgoing `chat:message` with the server events that follow,
+     * since the socket listeners are registered once and cannot read local state.
+     */
+    const pendingRef = useRef(null);
+
+    useEffect(() => {
+        const socket = getSocket();
+
+        const clearPending = () => {
+            pendingRef.current = null;
+        };
+
+        const rollback = () => {
+            const pending = pendingRef.current;
+            if (!pending) return;
+
+            const { chatId, optimisticChatId, tempMessageId, tempAiMessageId, resolvedChatId } =
+                pending;
+            const targetChatId = resolvedChatId || optimisticChatId;
+
+            // Drop the in-flight/partial AI placeholder.
+            if (tempAiMessageId) {
+                dispatch(
+                    removeMessage({ chatId: targetChatId, messageId: tempAiMessageId })
+                );
+            }
+
+            // If the chat was never persisted (no `chat:started`), also undo the
+            // optimistic user message (or the whole temp chat).
+            if (!resolvedChatId) {
+                if (chatId) {
+                    dispatch(
+                        removeMessage({ chatId: optimisticChatId, messageId: tempMessageId })
+                    );
+                } else {
+                    dispatch(removeChat(optimisticChatId));
+                }
+            }
+
+            clearPending();
+        };
+
+        const onStarted = (payload) => {
+            const pending = pendingRef.current;
+            if (!pending) return;
+
+            const { chatId, title } = payload;
+            pending.resolvedChatId = chatId;
+
+            dispatch(
+                appendAIMessage({
+                    chatId,
+                    previousId:
+                        pending.optimisticChatId !== chatId ? pending.optimisticChatId : null,
+                    title,
+                    message: {
+                        _id: pending.tempAiMessageId,
+                        role: "ai",
+                        content: "",
+                        streaming: true,
+                        createdAt: new Date().toISOString()
+                    }
+                })
+            );
+            dispatch(setCurrentChatId(chatId));
+        };
+
+        const onChunk = ({ chatId, chunk }) => {
+            dispatch(appendChunk({ chatId, chunk }));
+        };
+
+        const onDone = ({ chatId, messageId, content }) => {
+            dispatch(finalizeMessage({ chatId, messageId, content }));
+            dispatch(setLoading(false));
+            clearPending();
+        };
+
+        const onError = ({ message }) => {
+            dispatch(setError(message || "Failed to get a response"));
+            rollback();
+            dispatch(setLoading(false));
+        };
+
+        const onConnectError = () => {
+            dispatch(setError("Connection lost. Please refresh the page."));
+            rollback();
+            dispatch(setLoading(false));
+        };
+
+        socket.on("chat:started", onStarted);
+        socket.on("chat:ai_response_chunk", onChunk);
+        socket.on("chat:ai_response_done", onDone);
+        socket.on("chat:error", onError);
+        socket.on("connect_error", onConnectError);
+
+        return () => {
+            socket.off("chat:started", onStarted);
+            socket.off("chat:ai_response_chunk", onChunk);
+            socket.off("chat:ai_response_done", onDone);
+            socket.off("chat:error", onError);
+            socket.off("connect_error", onConnectError);
+        };
+    }, [dispatch]);
 
     async function handleGetChats() {
         try {
@@ -68,9 +176,19 @@ export const useChat = () => {
         dispatch(setCurrentChatId(null));
     }
 
-    async function handleSendMessage({ message, chatId }) {
+    function handleSendMessage({ message, chatId }) {
         const tempMessageId = createTempId();
+        const tempAiMessageId = createTempId();
         const optimisticChatId = chatId || `temp-chat-${tempMessageId}`;
+
+        pendingRef.current = {
+            chatId: chatId || null,
+            tempMessageId,
+            tempAiMessageId,
+            optimisticChatId,
+            // Existing chats already have a real id; new chats get one on chat:started.
+            resolvedChatId: chatId || null
+        };
 
         dispatch(setError(null));
 
@@ -83,7 +201,8 @@ export const useChat = () => {
                 message: {
                     _id: tempMessageId,
                     role: "user",
-                    content: message
+                    content: message,
+                    createdAt: new Date().toISOString()
                 }
             })
         );
@@ -92,41 +211,8 @@ export const useChat = () => {
 
         dispatch(setLoading(true));
 
-        try {
-            const data = await sendMessage({ message, chatId });
-            const { chat, chatTitle, messages, aiMessage } = data;
-
-            // Re-fetched from the DB: every message now carries its real `_id`.
-            const allMessages = [...(messages ?? []), aiMessage].filter(Boolean);
-            const resolvedChatId = chat?._id || chatId;
-
-            if (chat) {
-                dispatch(
-                    upsertChat({
-                        chat: { ...chat, title: chat.title || chatTitle || buildTitle(message) },
-                        messages: allMessages,
-                        previousId: optimisticChatId
-                    })
-                );
-            } else {
-                dispatch(setChatMessages({ chatId: resolvedChatId, messages: allMessages }));
-            }
-
-            dispatch(setCurrentChatId(resolvedChatId));
-            return allMessages;
-        } catch (err) {
-            dispatch(setError(err.response?.data?.message || "Failed to get a response"));
-
-            if (chatId) {
-                dispatch(removeMessage({ chatId: optimisticChatId, messageId: tempMessageId }));
-            } else {
-                dispatch(removeChat(optimisticChatId));
-            }
-
-            return null;
-        } finally {
-            dispatch(setLoading(false));
-        }
+        // Fire-and-forget: the server events drive the rest of the UI.
+        getSocket().emit("chat:message", { content: message, chatId });
     }
 
     async function handleDeleteChat(chatId) {
@@ -142,7 +228,7 @@ export const useChat = () => {
         chats,
         currentChatId,
         isLoading,
-        initializeSocketConnection,
+        getSocket,
         handleGetChats,
         handleSelectChat,
         handleNewChat,

@@ -8,6 +8,7 @@ import {
     appendMessage,
     appendAIMessage,
     appendChunk,
+    appendAgentEvent,
     finalizeMessage,
     removeMessage,
     removeChat,
@@ -95,6 +96,7 @@ export const useChat = () => {
                         role: "ai",
                         content: "",
                         streaming: true,
+                        metadata: { timeline: [], sources: [] },
                         createdAt: new Date().toISOString()
                     }
                 })
@@ -106,8 +108,12 @@ export const useChat = () => {
             dispatch(appendChunk({ chatId, chunk }));
         };
 
-        const onDone = ({ chatId, messageId, content }) => {
-            dispatch(finalizeMessage({ chatId, messageId, content }));
+        const onThought = ({ chatId, event }) => {
+            dispatch(appendAgentEvent({ chatId, event }));
+        };
+
+        const onDone = ({ chatId, messageId, content, metadata }) => {
+            dispatch(finalizeMessage({ chatId, messageId, content, metadata }));
             dispatch(setLoading(false));
             clearPending();
         };
@@ -125,6 +131,7 @@ export const useChat = () => {
         };
 
         socket.on("chat:started", onStarted);
+        socket.on("chat:thought", onThought);
         socket.on("chat:ai_response_chunk", onChunk);
         socket.on("chat:ai_response_done", onDone);
         socket.on("chat:error", onError);
@@ -132,6 +139,7 @@ export const useChat = () => {
 
         return () => {
             socket.off("chat:started", onStarted);
+            socket.off("chat:thought", onThought);
             socket.off("chat:ai_response_chunk", onChunk);
             socket.off("chat:ai_response_done", onDone);
             socket.off("chat:error", onError);

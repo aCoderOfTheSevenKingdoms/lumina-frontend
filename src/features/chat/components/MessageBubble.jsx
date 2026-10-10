@@ -1,5 +1,6 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import ThoughtThread from "./ThoughtThread";
 
 const RobotIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
@@ -69,8 +70,9 @@ const markdownComponents = {
 const MessageBubble = ({ message }) => {
   const isUser = message.role === "user";
   const isStreaming = Boolean(message.streaming);
-  // Loader dots until the first token arrives, blinking cursor once content flows.
-  const showTyping = !isUser && isStreaming && !message.content;
+  const hasTimeline = Boolean(message.metadata?.timeline?.length);
+  // Loader dots only before the first thought event lands.
+  const showTyping = !isUser && isStreaming && !message.content && !hasTimeline;
 
   return (
     <div className={`flex items-end gap-3 ${isUser ? "flex-row-reverse" : "flex-row"}`}>
@@ -91,22 +93,30 @@ const MessageBubble = ({ message }) => {
       >
         {isUser ? (
           message.content
-        ) : showTyping ? (
-          <span className="flex items-center gap-1 py-1" aria-label="Lumina is typing">
-            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-lumen [animation-delay:-0.3s]" />
-            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-lumen [animation-delay:-0.15s]" />
-            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-lumen" />
-          </span>
         ) : (
           <>
-            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-              {message.content}
-            </ReactMarkdown>
-            {isStreaming && (
-              <span
-                aria-hidden="true"
-                className="ml-0.5 inline-block h-4 w-2 translate-y-0.5 animate-pulse rounded-[1px] bg-lumen"
-              />
+            <ThoughtThread message={message} />
+
+            {message.content ? (
+              <>
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                  {message.content}
+                </ReactMarkdown>
+                {isStreaming && (
+                  <span
+                    aria-hidden="true"
+                    className="ml-0.5 inline-block h-4 w-2 translate-y-0.5 animate-pulse rounded-[1px] bg-lumen"
+                  />
+                )}
+              </>
+            ) : (
+              showTyping && (
+                <span className="flex items-center gap-1 py-1" aria-label="Lumina is thinking">
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-lumen [animation-delay:-0.3s]" />
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-lumen [animation-delay:-0.15s]" />
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-lumen" />
+                </span>
+              )
             )}
           </>
         )}

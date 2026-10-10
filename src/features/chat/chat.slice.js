@@ -96,8 +96,38 @@ const chatSlice = createSlice({
 
             chat.updatedAt = new Date().toISOString();
         },
+        appendAgentEvent: (state, action) => {
+            const {chatId, event} = action.payload;
+            const chat = state.chats[chatId];
+
+            if(!chat) return;
+
+            const messages = chat.messages ?? [];
+
+            for (let i = messages.length - 1; i >= 0; i -= 1) {
+                if(messages[i].streaming) {
+                    const message = messages[i];
+                    if(!message.metadata) {
+                        message.metadata = {timeline: [], sources: []};
+                    }
+                    message.metadata.timeline = [
+                        ...(message.metadata.timeline ?? []),
+                        event
+                    ];
+                    if(event.type === "sources" && event.sources?.length) {
+                        message.metadata.sources = [
+                            ...(message.metadata.sources ?? []),
+                            ...event.sources 
+                        ];
+                    }
+                    break;
+                }
+            }
+
+            chat.updatedAt = new Date().toISOString();
+        },
         finalizeMessage: (state, action) => {
-            const { chatId, messageId, content } = action.payload;
+            const { chatId, messageId, content, metadata } = action.payload;
             const chat = state.chats[chatId];
 
             if (!chat) return;
@@ -108,6 +138,7 @@ const chatSlice = createSlice({
                 if (messages[i].streaming) {
                     if (messageId) messages[i]._id = messageId;
                     if (content != null) messages[i].content = content;
+                    if (metadata) messages[i].metadata = metadata;
                     messages[i].streaming = false;
                     break;
                 }
@@ -152,6 +183,7 @@ export const {
     appendMessage,
     appendAIMessage,
     appendChunk,
+    appendAgentEvent,
     finalizeMessage,
     removeMessage,
     removeChat,
